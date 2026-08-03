@@ -1,0 +1,13 @@
+# Node
+node_modules/
+.env
+
+# .NET
+bin/
+obj/
+*.user
+*.log
+
+# OS Files
+.DS_Store
+Thumbs.db

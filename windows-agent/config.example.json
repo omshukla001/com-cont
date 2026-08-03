@@ -1,0 +1,7 @@
+{
+    "deviceId": "5a2b1c8f-1234-4abc-8888-def123456789",
+    "deviceName": "Gaming-PC",
+    "serverUrl": "ws://localhost:3000",
+    "token": "LONG_RANDOM_DEVICE_TOKEN",
+    "xmrigPath": "C:\\Mining\\xmrig\\xmrig.exe"
+}

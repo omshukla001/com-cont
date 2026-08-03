@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PC Control Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon"></div>
+                <h2>PC Control</h2>
+            </div>
+            <nav>
+                <a href="#" class="nav-item active" id="nav-devices">Devices</a>
+                <a href="#" class="nav-item" id="nav-policy">Global Policy</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Devices View -->
+            <section id="view-devices" class="view active">
+                <header>
+                    <h1>Managed Devices</h1>
+                    <button class="btn btn-primary" onclick="fetchDevices()">Refresh</button>
+                </header>
+                <div class="device-grid" id="device-grid">
+                    <!-- Cards injected by JS -->
+                </div>
+            </section>
+
+            <!-- Global Policy View -->
+            <section id="view-policy" class="view">
+                <header>
+                    <h1>Global Power Policy</h1>
+                    <div class="actions">
+                        <button class="btn btn-secondary" onclick="applyPolicyNow()">Apply Now</button>
+                        <button class="btn btn-primary" onclick="savePolicy()">Save Policy</button>
+                    </div>
+                </header>
+                <div class="card policy-card">
+                    <div class="form-group">
+                        <label>Performance Mode</label>
+                        <div class="time-inputs">
+                            <input type="time" id="perf-start">
+                            <span>to</span>
+                            <input type="time" id="perf-end">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Efficiency Mode</label>
+                        <div class="time-inputs">
+                            <input type="time" id="eff-start">
+                            <span>to</span>
+                            <input type="time" id="eff-end">
+                        </div>
+                    </div>
+                    
+                    <div class="divider"></div>
+                    
+                    <h3>Settings</h3>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" id="set-auto"> Enable Automatic Policy</label>
+                        <label><input type="checkbox" id="set-startup"> Apply Policy After Startup</label>
+                        <label><input type="checkbox" id="set-reconnect"> Apply Policy After Reconnect</label>
+                        <label><input type="checkbox" id="set-reapply"> Reapply Policy Every 5 Minutes</label>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Override Modal -->
+    <div class="modal-overlay" id="override-modal">
+        <div class="modal card">
+            <h3 id="modal-title">Manual Override</h3>
+            <p id="modal-desc">Select power mode override for this PC.</p>
+            <div class="form-group">
+                <label>Target Mode</label>
+                <select id="override-mode">
+                    <option value="Performance">Performance (High Performance)</option>
+                    <option value="Balanced">Balanced</option>
+                    <option value="Power saver">Efficiency (Power Saver)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Duration</label>
+                <select id="override-duration">
+                    <option value="60">1 Hour</option>
+                    <option value="120">2 Hours</option>
+                    <option value="480">8 Hours</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="submitOverride()">Apply Override</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

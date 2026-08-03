@@ -1,0 +1,132 @@
+:root {
+    --bg-dark: #0f1115;
+    --bg-card: rgba(25, 28, 36, 0.7);
+    --border: rgba(255, 255, 255, 0.08);
+    --text-main: #e2e8f0;
+    --text-muted: #94a3b8;
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --success: #10b981;
+    --danger: #ef4444;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    line-height: 1.5;
+    background-image: radial-gradient(circle at top right, rgba(59, 130, 246, 0.1), transparent 400px);
+    background-attachment: fixed;
+}
+
+.app-container {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 260px;
+    background: rgba(15, 17, 21, 0.95);
+    border-right: 1px solid var(--border);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+
+.logo { display: flex; align-items: center; gap: 12px; }
+.logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--primary), #8b5cf6); border-radius: 8px; }
+
+.nav-item {
+    display: block;
+    padding: 12px 16px;
+    color: var(--text-muted);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+.nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text-main); }
+.nav-item.active { background: rgba(59, 130, 246, 0.1); color: var(--primary); }
+
+/* Main Content */
+.main-content {
+    flex: 1;
+    padding: 40px;
+    max-width: 1200px;
+}
+
+header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+h1 { font-weight: 600; font-size: 24px; }
+
+.view { display: none; animation: fadeIn 0.3s ease; }
+.view.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Cards */
+.card {
+    background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+}
+
+.device-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 24px;
+}
+
+.device-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.device-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+    border-color: rgba(255,255,255,0.15);
+}
+
+.dev-header { display: flex; justify-content: space-between; margin-bottom: 16px; }
+.dev-title { font-size: 18px; font-weight: 600; }
+.badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.badge.online { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+.badge.offline { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+
+.dev-stats { display: flex; flex-direction: column; gap: 8px; font-size: 14px; margin-bottom: 20px; color: var(--text-muted); }
+.dev-stats span { color: var(--text-main); font-weight: 500; }
+
+/* Buttons */
+.btn {
+    padding: 10px 20px; border-radius: 8px; border: none; font-weight: 500; font-family: inherit;
+    cursor: pointer; transition: all 0.2s; background: rgba(255,255,255,0.1); color: white;
+}
+.btn:hover { background: rgba(255,255,255,0.15); }
+.btn-primary { background: var(--primary); }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-block { width: 100%; }
+
+/* Forms */
+.policy-card { max-width: 600px; }
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; font-size: 14px; color: var(--text-muted); margin-bottom: 8px; }
+.time-inputs { display: flex; align-items: center; gap: 12px; }
+input[type="time"], select {
+    background: rgba(0,0,0,0.2); border: 1px solid var(--border); color: white;
+    padding: 10px 14px; border-radius: 8px; font-family: inherit;
+}
+.divider { height: 1px; background: var(--border); margin: 32px 0; }
+.checkbox-group label { display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-main); }
+
+/* Modal */
+.modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+    display: none; align-items: center; justify-content: center; z-index: 100;
+}
+.modal-overlay.active { display: flex; }
+.modal { width: 400px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }

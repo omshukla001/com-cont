@@ -29,41 +29,48 @@ function Log($msg) {
 
 # Ensure all required power plans exist on this PC
 function Ensure-PowerPlans {
-    $schemes = powercfg /list
+    $schemes = powercfg /list 2>&1 | Out-String
     if ($schemes -notmatch "High performance") {
         Log "Creating 'High performance' power plan..."
-        powercfg /duplicatescheme 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
+        powercfg /duplicatescheme 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c 2>&1 | Out-Null
     }
     if ($schemes -notmatch "Power saver") {
         Log "Creating 'Power saver' power plan..."
-        powercfg /duplicatescheme a1841308-3541-4fab-bc81-f71556f20b4a
+        powercfg /duplicatescheme a1841308-3541-4fab-bc81-f71556f20b4a 2>&1 | Out-Null
     }
 }
 Ensure-PowerPlans
 
 function Get-PowerMode {
     try {
-        $out = powercfg /getactivescheme
-        if ($out -match '\((.+)\)') { return $Matches[1] }
+        $out = powercfg /getactivescheme 2>&1 | Out-String
+        if ($out -match '\((.+)\)') { return $Matches[1].Trim() }
     } catch {}
     return "Unknown"
 }
 
-function Set-PowerMode($guid, $label) {
-    try {
-        powercfg /setactive $guid
-        Start-Sleep -Milliseconds 500
-        $current = Get-PowerMode
-        return @{ success = $true; message = "Set to $current" }
-    } catch {
-        return @{ success = $false; message = "Failed to set $label : $_" }
+function Find-PlanGuid($planName) {
+    $schemes = powercfg /list 2>&1 | Out-String
+    foreach ($line in ($schemes -split "`n")) {
+        if ($line -match 'GUID:\s+([a-fA-F0-9\-]+)' -and $line -like "*$planName*") {
+            return $Matches[1]
+        }
     }
+    return $null
 }
 
-# Well-known Windows power plan GUIDs
-$GUID_HIGH_PERFORMANCE = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"
-$GUID_BALANCED         = "381b4222-f694-41f0-9685-ff5bb260df2e"
-$GUID_POWER_SAVER      = "a1841308-3541-4fab-bc81-f71556f20b4a"
+function Set-PowerMode($planName) {
+    # Method 1: Find the actual GUID from the plan list
+    $guid = Find-PlanGuid $planName
+    if ($guid) {
+        powercfg /setactive $guid 2>&1 | Out-Null
+        Start-Sleep -Milliseconds 500
+        $current = Get-PowerMode
+        Log "powercfg /setactive $guid -> $current"
+        return @{ success = $true; message = "Set to $current" }
+    }
+    return @{ success = $false; message = "Plan '$planName' not found" }
+}
 
 function Get-XmrigRunning {
     return $null -ne (Get-Process -Name "xmrig" -ErrorAction SilentlyContinue)
@@ -105,9 +112,9 @@ function Stop-Xmrig {
 
 function Handle-Command($cmd, $requestId) {
     $result = switch ($cmd) {
-        "SET_PERFORMANCE"      { Set-PowerMode $GUID_HIGH_PERFORMANCE "High Performance" }
-        "SET_BALANCED"         { Set-PowerMode $GUID_BALANCED "Balanced" }
-        "SET_POWER_EFFICIENCY" { Set-PowerMode $GUID_POWER_SAVER "Power Saver" }
+        "SET_PERFORMANCE"      { Set-PowerMode "High performance" }
+        "SET_BALANCED"         { Set-PowerMode "Balanced" }
+        "SET_POWER_EFFICIENCY" { Set-PowerMode "Power saver" }
         "START_XMRIG"         { Start-Xmrig }
         "STOP_XMRIG"          { Stop-Xmrig }
         "GET_STATUS"          { @{ success = $true; message = "Power: $(Get-PowerMode), XMRig: $(if(Get-XmrigRunning){'Running'}else{'Stopped'})" } }
@@ -194,14 +201,14 @@ while ($true) {
                         Log "Policy update received."
                     }
                     elseif ($data.type -eq "override") {
-                        $modeGuid = switch -Wildcard ($data.mode) {
-                            "*erformance*" { $GUID_HIGH_PERFORMANCE }
-                            "*alanced*"    { $GUID_BALANCED }
-                            "*ower*"       { $GUID_POWER_SAVER }
-                            "*aver*"       { $GUID_POWER_SAVER }
-                            default        { $GUID_BALANCED }
+                        $planName = switch -Wildcard ($data.mode) {
+                            "*erformance*" { "High performance" }
+                            "*alanced*"    { "Balanced" }
+                            "*ower*"       { "Power saver" }
+                            "*aver*"       { "Power saver" }
+                            default        { "Balanced" }
                         }
-                        $r = Set-PowerMode $modeGuid $data.mode
+                        $r = Set-PowerMode $planName
                         Log "Override: $($data.mode) - $($r.message)"
                     }
                 } catch {

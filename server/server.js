@@ -27,7 +27,7 @@ const loginLimiter = rateLimit({
 
 app.use(express.json());
 app.use(globalLimiter);
-app.use(express.static(path.join(__dirname, '../dashboard')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // --- AUTHENTICATION ---
 // These will be overridden by Render Environment Variables if set!

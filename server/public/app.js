@@ -1,6 +1,18 @@
 // Auth State
 let authToken = localStorage.getItem('pc_token');
 
+function togglePassword() {
+    const input = document.getElementById('login-password');
+    const btn = document.getElementById('toggle-password');
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+    } else {
+        input.type = 'password';
+        btn.textContent = '👁';
+    }
+}
+
 if (authToken) {
     showDashboard();
 }

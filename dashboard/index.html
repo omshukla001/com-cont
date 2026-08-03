@@ -8,7 +8,28 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="app-container">
+    <!-- Login View -->
+    <div class="login-container" id="login-view">
+        <div class="card login-card">
+            <div class="logo" style="justify-content: center; margin-bottom: 24px;">
+                <div class="logo-icon"></div>
+                <h2>PC Control</h2>
+            </div>
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="login-username" placeholder="Enter username" style="width: 100%;">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="login-password" placeholder="Enter password" style="width: 100%;">
+            </div>
+            <div id="login-error" style="color: var(--danger); font-size: 14px; margin-bottom: 16px; display: none;"></div>
+            <button class="btn btn-primary btn-block" onclick="performLogin()">Login</button>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div class="app-container" id="app-view" style="display: none;">
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="logo">
@@ -19,6 +40,9 @@
                 <a href="#" class="nav-item active" id="nav-devices">Devices</a>
                 <a href="#" class="nav-item" id="nav-policy">Global Policy</a>
             </nav>
+            <div style="margin-top: auto;">
+                <button class="btn btn-block" style="background: rgba(239, 68, 68, 0.1); color: var(--danger);" onclick="logout()">Logout</button>
+            </div>
         </aside>
 
         <!-- Main Content -->

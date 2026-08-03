@@ -1,3 +1,76 @@
+// Auth State
+let authToken = localStorage.getItem('pc_token');
+
+if (authToken) {
+    showDashboard();
+}
+
+function showDashboard() {
+    document.getElementById('login-view').style.display = 'none';
+    document.getElementById('app-view').style.display = 'flex';
+    loadPolicy();
+    fetchDevices();
+    if (!window.pollInterval) {
+        window.pollInterval = setInterval(fetchDevices, 5000);
+    }
+}
+
+function showLogin() {
+    document.getElementById('login-view').style.display = 'flex';
+    document.getElementById('app-view').style.display = 'none';
+    if (window.pollInterval) {
+        clearInterval(window.pollInterval);
+        window.pollInterval = null;
+    }
+}
+
+async function performLogin() {
+    const u = document.getElementById('login-username').value;
+    const p = document.getElementById('login-password').value;
+    const errEl = document.getElementById('login-error');
+    
+    try {
+        const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: u, password: p })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            authToken = data.token;
+            localStorage.setItem('pc_token', authToken);
+            errEl.style.display = 'none';
+            showDashboard();
+        } else {
+            errEl.innerText = data.error || 'Login failed';
+            errEl.style.display = 'block';
+        }
+    } catch (e) {
+        errEl.innerText = 'Network error or rate limited (DDoS protection active).';
+        errEl.style.display = 'block';
+    }
+}
+
+function logout() {
+    authToken = null;
+    localStorage.removeItem('pc_token');
+    showLogin();
+}
+
+// Authenticated Fetch Wrapper
+async function authFetch(url, options = {}) {
+    if (!options.headers) options.headers = {};
+    options.headers['Authorization'] = `Bearer ${authToken}`;
+    
+    const res = await fetch(url, options);
+    if (res.status === 401) {
+        logout();
+        throw new Error('Unauthorized');
+    }
+    return res;
+}
+
 // Navigation
 document.getElementById('nav-devices').addEventListener('click', (e) => switchView(e, 'view-devices'));
 document.getElementById('nav-policy').addEventListener('click', (e) => switchView(e, 'view-policy'));
@@ -12,15 +85,15 @@ function switchView(e, viewId) {
 // API Calls
 async function fetchDevices() {
     try {
-        const res = await fetch('/api/devices');
+        const res = await authFetch('/api/devices');
         const devices = await res.json();
         renderDevices(devices);
-    } catch (err) { console.error('Failed to fetch devices', err); }
+    } catch (err) { console.error(err); }
 }
 
 async function loadPolicy() {
     try {
-        const res = await fetch('/api/policy');
+        const res = await authFetch('/api/policy');
         const policy = await res.json();
         
         document.getElementById('perf-start').value = policy.performanceStartTime;
@@ -32,7 +105,7 @@ async function loadPolicy() {
         document.getElementById('set-startup').checked = policy.applyPolicyAfterStartup;
         document.getElementById('set-reconnect').checked = policy.applyPolicyAfterReconnect;
         document.getElementById('set-reapply').checked = policy.reapplyPolicyEvery5Minutes;
-    } catch (err) { console.error('Failed to load policy', err); }
+    } catch (err) { console.error(err); }
 }
 
 async function savePolicy() {
@@ -47,7 +120,7 @@ async function savePolicy() {
         reapplyPolicyEvery5Minutes: document.getElementById('set-reapply').checked
     };
     
-    await fetch('/api/policy', {
+    await authFetch('/api/policy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(policy)
@@ -56,7 +129,7 @@ async function savePolicy() {
 }
 
 async function applyPolicyNow() {
-    await fetch('/api/apply-now', { method: 'POST' });
+    await authFetch('/api/apply-now', { method: 'POST' });
     alert('Enforcement signal sent to all online PCs.');
 }
 
@@ -81,7 +154,7 @@ function renderDevices(devices) {
                 <div class="dev-stats">
                     <div>Mode: <span>${dev.powerMode}</span></div>
                     <div>Policy target: <span>${dev.activePolicy}</span></div>
-                    <div>Agent Version: <span>${dev.agentVersion || '1.0.0'}</span></div>
+                    <div>Computer: <span>${dev.computerName || 'Unknown'}</span></div>
                 </div>
                 <button class="btn btn-block" onclick="openOverrideModal('${dev.deviceId}', '${dev.deviceName}')" ${!isOnline ? 'disabled' : ''}>
                     Manual Override
@@ -111,7 +184,7 @@ async function submitOverride() {
     const mode = document.getElementById('override-mode').value;
     const duration = document.getElementById('override-duration').value;
     
-    await fetch('/api/override', {
+    await authFetch('/api/override', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId: currentOverrideDeviceId, mode, durationMinutes: parseInt(duration) })
@@ -120,8 +193,3 @@ async function submitOverride() {
     closeModal();
     fetchDevices();
 }
-
-// Init
-loadPolicy();
-fetchDevices();
-setInterval(fetchDevices, 5000); // Poll for real-time status

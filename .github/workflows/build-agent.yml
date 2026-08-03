@@ -1,0 +1,36 @@
+name: Build Windows Agent
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Publish Single-File Executable
+      run: |
+        cd windows-agent/PC-Agent
+        dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ../publish
+
+    - name: Package Release Files
+      run: |
+        cd windows-agent
+        copy install.bat publish\
+        copy config.example.json publish\config.json
+        Compress-Archive -Path publish\* -DestinationPath PC-Agent-Release.zip
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: PC-Agent-Release
+        path: windows-agent/PC-Agent-Release.zip

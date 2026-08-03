@@ -12,6 +12,7 @@ public class WebSocketClient : BackgroundService
     private readonly PowerManager _powerManager;
     private readonly ILogger<WebSocketClient> _logger;
     private ClientWebSocket? _ws;
+    private static readonly HttpClient _httpClient = new HttpClient();
 
     public WebSocketClient(AgentConfig config, PowerPolicyService policyService, PowerManager powerManager, ILogger<WebSocketClient> logger)
     {
@@ -53,6 +54,9 @@ public class WebSocketClient : BackgroundService
                 // Start heartbeat loop
                 _ = HeartbeatLoopAsync(stoppingToken);
 
+                // Start HTTP ping loop to keep Render free tier awake
+                _ = RenderKeepAliveLoopAsync(stoppingToken);
+
                 // Listen for messages (Policy updates, Manual Overrides)
                 var buffer = new byte[8192];
                 while (_ws.State == WebSocketState.Open && !stoppingToken.IsCancellationRequested)
@@ -86,6 +90,22 @@ public class WebSocketClient : BackgroundService
             };
             await SendMessageAsync(status, stoppingToken);
             await Task.Delay(15000, stoppingToken); // 15 seconds heartbeat
+        }
+    }
+
+    private async Task RenderKeepAliveLoopAsync(CancellationToken stoppingToken)
+    {
+        string httpUrl = _config.ServerUrl.Replace("wss://", "https://").Replace("ws://", "http://") + "/api/ping";
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await _httpClient.GetAsync(httpUrl, stoppingToken);
+            }
+            catch { /* Ignore ping errors */ }
+            
+            // Ping every 10 minutes to prevent Render from sleeping
+            await Task.Delay(TimeSpan.FromMinutes(10), stoppingToken);
         }
     }
 

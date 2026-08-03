@@ -24,6 +24,10 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../dashboard')));
 
 // --- DASHBOARD API ---
+app.get('/api/ping', (req, res) => {
+    res.send('pong'); // Keeps the free Render instance awake
+});
+
 app.get('/api/devices', (req, res) => {
     res.json(Array.from(devices.values()));
 });

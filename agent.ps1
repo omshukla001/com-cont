@@ -207,6 +207,7 @@ while ($true) {
                     elseif ($data.type -eq "policy_update") {
                         Log "Policy update received."
                         $global:currentPolicy = $data.policy
+                        $global:lastPolicyTime = $null # Force immediate re-evaluation
                     }
                     elseif ($data.type -eq "override") {
                         $planName = switch -Wildcard ($data.mode) {
@@ -225,17 +226,16 @@ while ($true) {
             }
 
             # Enforce policy every 5 minutes if enabled, or instantly on first receive
-            if ($global:currentPolicy -and $global:currentPolicy.enabled) {
+            if ($global:currentPolicy -and $global:currentPolicy.enableAutomaticPolicy) {
                 if ($global:lastPolicyTime -eq $null -or ([DateTime]::Now - $global:lastPolicyTime).TotalMinutes -ge 5) {
                     $now = [DateTime]::Now
                     $currentTime = "$($now.ToString('HH:mm'))"
                     $mode = "Balanced" # Default
 
-                    # Simple time check (assumes times are in format HH:mm 24-hour)
-                    # Convert policy AM/PM to 24 hour for comparison
                     try {
-                        $perfStart = [DateTime]::Parse($global:currentPolicy.perfStart).ToString('HH:mm')
-                        $perfEnd = [DateTime]::Parse($global:currentPolicy.perfEnd).ToString('HH:mm')
+                        # Using the correct keys from app.js payload
+                        $perfStart = [DateTime]::Parse($global:currentPolicy.performanceStartTime).ToString('HH:mm')
+                        $perfEnd = [DateTime]::Parse($global:currentPolicy.performanceEndTime).ToString('HH:mm')
                         
                         if ($perfStart -lt $perfEnd) {
                             if ($currentTime -ge $perfStart -and $currentTime -le $perfEnd) { $mode = "High performance" }
@@ -246,13 +246,15 @@ while ($true) {
                             else { $mode = "Power saver" }
                         }
                     } catch {
-                        Log "Error parsing policy times. Defaulting to Balanced."
+                        Log "Error parsing policy times. Defaulting to Balanced. Exception: $_"
                     }
 
                     $currentMode = Get-PowerMode
                     if ($currentMode -notmatch $mode) {
                         Log "Enforcing policy: Switching to $mode"
                         Set-PowerMode $mode | Out-Null
+                    } else {
+                        Log "Policy check: Already on $mode"
                     }
                     
                     $global:lastPolicyTime = [DateTime]::Now
@@ -265,7 +267,7 @@ while ($true) {
                     type         = "status"
                     deviceId     = $DeviceId
                     powerMode    = (Get-PowerMode)
-                    activePolicy = if ($global:currentPolicy -and $global:currentPolicy.enabled) { "Active" } else { "Disabled" }
+                    activePolicy = if ($global:currentPolicy -and $global:currentPolicy.enableAutomaticPolicy) { "Active" } else { "Disabled" }
                     xmrigRunning = (Get-XmrigRunning)
                     xmrigHashrate = 0
                 } | ConvertTo-Json -Compress

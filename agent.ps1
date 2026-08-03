@@ -143,8 +143,53 @@ while ($true) {
 
         $lastHeartbeat = [DateTime]::MinValue
         $lastPing = [DateTime]::MinValue
+        $receiveTask = $null
+        $buf = $null
 
         while ($ws.State -eq [System.Net.WebSockets.WebSocketState]::Open) {
+
+            # Start a receive if we don't have one pending
+            if ($null -eq $receiveTask) {
+                $buf = New-Object byte[] 8192
+                $seg = [System.ArraySegment[byte]]::new($buf)
+                $receiveTask = $ws.ReceiveAsync($seg, [System.Threading.CancellationToken]::None)
+            }
+
+            # Check if a message arrived (non-blocking)
+            if ($receiveTask.IsCompleted) {
+                if ($receiveTask.IsFaulted) {
+                    Log "Receive error: $($receiveTask.Exception.InnerException.Message)"
+                    break
+                }
+                if ($receiveTask.Result.MessageType -eq [System.Net.WebSockets.WebSocketMessageType]::Close) {
+                    Log "Server closed connection."
+                    break
+                }
+
+                $msg = [System.Text.Encoding]::UTF8.GetString($buf, 0, $receiveTask.Result.Count)
+                $receiveTask = $null  # Ready for next message
+
+                try {
+                    $data = $msg | ConvertFrom-Json
+
+                    if ($data.type -eq "command") {
+                        Log "Command received: $($data.command)"
+                        $response = Handle-Command $data.command $data.requestId
+                        Send-WS $ws $response
+                        Log "Command result sent."
+                    }
+                    elseif ($data.type -eq "policy_update") {
+                        Log "Policy update received."
+                    }
+                    elseif ($data.type -eq "override") {
+                        $r = Set-PowerMode $data.mode
+                        Log "Override: $($data.mode) - $($r.message)"
+                    }
+                } catch {
+                    Log "Error processing message: $_"
+                }
+            }
+
             # Heartbeat every 15 seconds
             if (([DateTime]::Now - $lastHeartbeat).TotalSeconds -ge 15) {
                 $status = @{
@@ -161,48 +206,22 @@ while ($true) {
 
             # Keep Render awake every 10 minutes
             if (([DateTime]::Now - $lastPing).TotalMinutes -ge 10) {
-                try { 
-                    (New-Object System.Net.WebClient).DownloadString("$httpUrl/api/ping") | Out-Null 
+                try {
+                    (New-Object System.Net.WebClient).DownloadString("$httpUrl/api/ping") | Out-Null
                 } catch {}
                 $lastPing = [DateTime]::Now
             }
 
-            # Listen for messages (2 second timeout)
-            try {
-                $buf = New-Object byte[] 8192
-                $seg = [System.ArraySegment[byte]]::new($buf)
-                $cts = New-Object System.Threading.CancellationTokenSource(2000)
-                $task = $ws.ReceiveAsync($seg, $cts.Token)
-                $task.Wait()
-
-                if ($task.Result.MessageType -eq [System.Net.WebSockets.WebSocketMessageType]::Close) { break }
-
-                $msg = [System.Text.Encoding]::UTF8.GetString($buf, 0, $task.Result.Count)
-                $data = $msg | ConvertFrom-Json
-
-                if ($data.type -eq "command") {
-                    Log "Command received: $($data.command)"
-                    $response = Handle-Command $data.command $data.requestId
-                    Send-WS $ws $response
-                    Log "Command result sent."
-                }
-                elseif ($data.type -eq "policy_update") {
-                    Log "Policy update received."
-                }
-                elseif ($data.type -eq "override") {
-                    $r = Set-PowerMode $data.mode
-                    Log "Override: $($data.mode) - $($r.message)"
-                }
-            }
-            catch [System.OperationCanceledException] { }
-            catch [System.AggregateException] {
-                $inner = $_.Exception.InnerException
-                if ($inner -isnot [System.OperationCanceledException] -and 
-                    $inner -isnot [System.Threading.Tasks.TaskCanceledException]) { throw }
-            }
+            # Small sleep to avoid CPU spinning
+            Start-Sleep -Milliseconds 500
         }
     } catch {
         Log "Disconnected: $_. Reconnecting in 5s..."
+    }
+
+    # Cleanup
+    if ($ws) {
+        try { $ws.Dispose() } catch {}
     }
     Start-Sleep -Seconds 5
 }

@@ -29,9 +29,9 @@ app.use(globalLimiter);
 app.use(express.static(path.join(__dirname, '../dashboard')));
 
 // --- AUTHENTICATION ---
-// These will be overridden by Render Environment Variables!
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'password123';
+// These will be overridden by Render Environment Variables if set!
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'cr';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Crmining@2006';
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key-12345';
 
 app.post('/api/login', loginLimiter, (req, res) => {

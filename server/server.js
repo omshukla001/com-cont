@@ -4,6 +4,7 @@ const WebSocket = require('ws');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
@@ -31,12 +32,17 @@ app.use(express.static(path.join(__dirname, '../dashboard')));
 // --- AUTHENTICATION ---
 // These will be overridden by Render Environment Variables if set!
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'cr';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Crmining@2006';
+// This is the SHA256 hash of 'Crmining@2006' so the plaintext password is not exposed in GitHub.
+const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || '4f6730ce48be74b1168d1d8f7a4d68e05c49f092dc9a4c50dc468ce803721865';
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key-12345';
 
 app.post('/api/login', loginLimiter, (req, res) => {
     const { username, password } = req.body;
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    
+    // Hash the incoming password to check it against our stored hash
+    const incomingHash = crypto.createHash('sha256').update(password || '').digest('hex');
+    
+    if (username === ADMIN_USERNAME && incomingHash === ADMIN_PASSWORD_HASH) {
         // Sign token that lasts for 24 hours
         const token = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
         res.json({ success: true, token });

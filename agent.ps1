@@ -49,23 +49,21 @@ function Get-PowerMode {
     return "Unknown"
 }
 
-function Set-PowerMode($name) {
-    $schemes = powercfg /list
-    foreach ($line in ($schemes -split "`n")) {
-        if ($line -match 'GUID:\s+([a-fA-F0-9\-]+)' -and $line -like "*$name*") {
-            $guid = $Matches[1]
-            powercfg /setactive $guid
-            Start-Sleep -Milliseconds 500
-            $current = Get-PowerMode
-            if ($current -like "*$name*") {
-                return @{ success = $true; message = "Set to $current" }
-            } else {
-                return @{ success = $false; message = "Failed. Current: $current" }
-            }
-        }
+function Set-PowerMode($guid, $label) {
+    try {
+        powercfg /setactive $guid
+        Start-Sleep -Milliseconds 500
+        $current = Get-PowerMode
+        return @{ success = $true; message = "Set to $current" }
+    } catch {
+        return @{ success = $false; message = "Failed to set $label : $_" }
     }
-    return @{ success = $false; message = "Mode '$name' not found on this system" }
 }
+
+# Well-known Windows power plan GUIDs
+$GUID_HIGH_PERFORMANCE = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"
+$GUID_BALANCED         = "381b4222-f694-41f0-9685-ff5bb260df2e"
+$GUID_POWER_SAVER      = "a1841308-3541-4fab-bc81-f71556f20b4a"
 
 function Get-XmrigRunning {
     return $null -ne (Get-Process -Name "xmrig" -ErrorAction SilentlyContinue)
@@ -107,9 +105,9 @@ function Stop-Xmrig {
 
 function Handle-Command($cmd, $requestId) {
     $result = switch ($cmd) {
-        "SET_PERFORMANCE"      { Set-PowerMode "High performance" }
-        "SET_BALANCED"         { Set-PowerMode "Balanced" }
-        "SET_POWER_EFFICIENCY" { Set-PowerMode "Power saver" }
+        "SET_PERFORMANCE"      { Set-PowerMode $GUID_HIGH_PERFORMANCE "High Performance" }
+        "SET_BALANCED"         { Set-PowerMode $GUID_BALANCED "Balanced" }
+        "SET_POWER_EFFICIENCY" { Set-PowerMode $GUID_POWER_SAVER "Power Saver" }
         "START_XMRIG"         { Start-Xmrig }
         "STOP_XMRIG"          { Stop-Xmrig }
         "GET_STATUS"          { @{ success = $true; message = "Power: $(Get-PowerMode), XMRig: $(if(Get-XmrigRunning){'Running'}else{'Stopped'})" } }
@@ -196,7 +194,14 @@ while ($true) {
                         Log "Policy update received."
                     }
                     elseif ($data.type -eq "override") {
-                        $r = Set-PowerMode $data.mode
+                        $modeGuid = switch -Wildcard ($data.mode) {
+                            "*erformance*" { $GUID_HIGH_PERFORMANCE }
+                            "*alanced*"    { $GUID_BALANCED }
+                            "*ower*"       { $GUID_POWER_SAVER }
+                            "*aver*"       { $GUID_POWER_SAVER }
+                            default        { $GUID_BALANCED }
+                        }
+                        $r = Set-PowerMode $modeGuid $data.mode
                         Log "Override: $($data.mode) - $($r.message)"
                     }
                 } catch {

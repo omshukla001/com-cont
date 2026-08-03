@@ -225,15 +225,16 @@ while ($true) {
                 }
             }
 
-            # Enforce policy every 5 minutes if enabled, or instantly on first receive
-            if ($global:currentPolicy -and $global:currentPolicy.enableAutomaticPolicy) {
-                if ($global:lastPolicyTime -eq $null -or ([DateTime]::Now - $global:lastPolicyTime).TotalMinutes -ge 5) {
+            # Check policy and heartbeat every 15 seconds
+            if (([DateTime]::Now - $lastHeartbeat).TotalSeconds -ge 15) {
+                
+                # 1. Enforce Policy if enabled
+                if ($global:currentPolicy -and $global:currentPolicy.enableAutomaticPolicy) {
                     $now = [DateTime]::Now
                     $currentTime = "$($now.ToString('HH:mm'))"
                     $mode = "Balanced" # Default
 
                     try {
-                        # Using the correct keys from app.js payload
                         $perfStart = [DateTime]::Parse($global:currentPolicy.performanceStartTime).ToString('HH:mm')
                         $perfEnd = [DateTime]::Parse($global:currentPolicy.performanceEndTime).ToString('HH:mm')
                         
@@ -241,7 +242,6 @@ while ($true) {
                             if ($currentTime -ge $perfStart -and $currentTime -le $perfEnd) { $mode = "High performance" }
                             else { $mode = "Power saver" }
                         } else {
-                            # Crosses midnight
                             if ($currentTime -ge $perfStart -or $currentTime -le $perfEnd) { $mode = "High performance" }
                             else { $mode = "Power saver" }
                         }
@@ -253,16 +253,10 @@ while ($true) {
                     if ($currentMode -notmatch $mode) {
                         Log "Enforcing policy: Switching to $mode"
                         Set-PowerMode $mode | Out-Null
-                    } else {
-                        Log "Policy check: Already on $mode"
                     }
-                    
-                    $global:lastPolicyTime = [DateTime]::Now
                 }
-            }
 
-            # Heartbeat every 15 seconds
-            if (([DateTime]::Now - $lastHeartbeat).TotalSeconds -ge 15) {
+                # 2. Send Status Heartbeat
                 $status = @{
                     type         = "status"
                     deviceId     = $DeviceId
@@ -274,6 +268,8 @@ while ($true) {
                 Send-WS $ws $status
                 $lastHeartbeat = [DateTime]::Now
             }
+
+
 
             # Keep Render awake every 10 minutes
             if (([DateTime]::Now - $lastPing).TotalMinutes -ge 10) {

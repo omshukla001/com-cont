@@ -63,8 +63,9 @@ function requireAuth(req, res, next) {
     });
 }
 
-// In-memory state for Phase 2.1
+// In-memory state
 const devices = new Map();
+const commandResults = new Map();
 let globalPolicy = {
     performanceStartTime: "18:00",
     performanceEndTime: "07:30",
@@ -75,6 +76,17 @@ let globalPolicy = {
     applyPolicyAfterReconnect: true,
     reapplyPolicyEvery5Minutes: true
 };
+
+// STRICT COMMAND ALLOWLIST — only these commands can be sent to agents
+// No arbitrary shell/cmd/powershell execution is permitted
+const ALLOWED_COMMANDS = [
+    'SET_PERFORMANCE',
+    'SET_BALANCED',
+    'SET_POWER_EFFICIENCY',
+    'START_XMRIG',
+    'STOP_XMRIG',
+    'GET_STATUS'
+];
 
 // --- DASHBOARD API ---
 app.get('/api/ping', (req, res) => {
@@ -114,6 +126,35 @@ app.post('/api/override', (req, res) => {
     }
 });
 
+// --- STRICT COMMAND ENDPOINT ---
+app.post('/api/command', (req, res) => {
+    const { deviceId, command } = req.body;
+
+    // SECURITY: Only allow commands from the strict allowlist
+    if (!command || !ALLOWED_COMMANDS.includes(command)) {
+        return res.status(400).json({ success: false, error: `Invalid command. Allowed: ${ALLOWED_COMMANDS.join(', ')}` });
+    }
+
+    const ws = Array.from(wss.clients).find(c => c.deviceId === deviceId);
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        return res.status(404).json({ success: false, error: 'Device is offline' });
+    }
+
+    const requestId = crypto.randomUUID();
+    ws.send(JSON.stringify({ type: 'command', command, requestId }));
+    console.log(`Command sent: ${command} -> ${deviceId} (${requestId})`);
+    res.json({ success: true, requestId });
+});
+
+app.get('/api/command-result/:requestId', (req, res) => {
+    const result = commandResults.get(req.params.requestId);
+    if (result) {
+        res.json({ success: true, result });
+    } else {
+        res.json({ success: true, result: null });
+    }
+});
+
 // --- WEBSOCKET FOR AGENTS ---
 wss.on('connection', (ws) => {
     ws.on('message', (message) => {
@@ -141,7 +182,23 @@ wss.on('connection', (ws) => {
                     const device = devices.get(ws.deviceId);
                     device.powerMode = data.powerMode;
                     device.activePolicy = data.activePolicy;
+                    device.xmrigRunning = data.xmrigRunning || false;
+                    device.xmrigHashrate = data.xmrigHashrate || 0;
                     device.lastSeen = new Date().toISOString();
+                }
+            }
+            else if (data.type === 'command_result') {
+                console.log(`Command result from ${ws.deviceId}:`, data.command, data.success ? 'OK' : 'FAIL');
+                if (data.requestId) {
+                    commandResults.set(data.requestId, {
+                        success: data.success,
+                        message: data.message,
+                        command: data.command,
+                        deviceId: ws.deviceId,
+                        timestamp: new Date().toISOString()
+                    });
+                    // Clean up old results after 5 minutes
+                    setTimeout(() => commandResults.delete(data.requestId), 5 * 60 * 1000);
                 }
             }
         } catch (err) {

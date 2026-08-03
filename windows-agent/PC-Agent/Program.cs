@@ -30,6 +30,7 @@ if (File.Exists(configPath))
 builder.Services.AddSingleton(config);
 builder.Services.AddSingleton<PowerManager>();
 builder.Services.AddSingleton<PowerPolicyService>();
+builder.Services.AddSingleton<XmrigManager>();
 
 // 3. Register Background Workers
 builder.Services.AddHostedService<PolicyScheduler>();

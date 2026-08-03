@@ -157,6 +157,7 @@ function renderDevices(devices) {
 
     devices.forEach(dev => {
         const isOnline = dev.status === 'online';
+        const disabledAttr = !isOnline ? 'disabled' : '';
         grid.innerHTML += `
             <div class="card device-card">
                 <div class="dev-header">
@@ -167,8 +168,20 @@ function renderDevices(devices) {
                     <div>Mode: <span>${dev.powerMode}</span></div>
                     <div>Policy target: <span>${dev.activePolicy}</span></div>
                     <div>Computer: <span>${dev.computerName || 'Unknown'}</span></div>
+                    <div>XMRig: <span style="color: ${dev.xmrigRunning ? 'var(--success)' : 'var(--text-muted)'}">${dev.xmrigRunning ? '⛏ Running' : 'Stopped'}</span></div>
                 </div>
-                <button class="btn btn-block" onclick="openOverrideModal('${dev.deviceId}', '${dev.deviceName}')" ${!isOnline ? 'disabled' : ''}>
+                <div class="cmd-buttons">
+                    <div class="cmd-row">
+                        <button class="btn btn-sm btn-perf" onclick="sendCommand('${dev.deviceId}', 'SET_PERFORMANCE', '${dev.deviceName}')" ${disabledAttr}>⚡ Performance</button>
+                        <button class="btn btn-sm btn-bal" onclick="sendCommand('${dev.deviceId}', 'SET_BALANCED', '${dev.deviceName}')" ${disabledAttr}>⚖ Balanced</button>
+                        <button class="btn btn-sm btn-eff" onclick="sendCommand('${dev.deviceId}', 'SET_POWER_EFFICIENCY', '${dev.deviceName}')" ${disabledAttr}>🍃 Efficiency</button>
+                    </div>
+                    <div class="cmd-row">
+                        <button class="btn btn-sm btn-xmrig-start" onclick="sendCommand('${dev.deviceId}', 'START_XMRIG', '${dev.deviceName}')" ${disabledAttr}>▶ Start XMRig</button>
+                        <button class="btn btn-sm btn-xmrig-stop" onclick="sendCommand('${dev.deviceId}', 'STOP_XMRIG', '${dev.deviceName}')" ${disabledAttr}>⏹ Stop XMRig</button>
+                    </div>
+                </div>
+                <button class="btn btn-block" style="margin-top: 12px;" onclick="openOverrideModal('${dev.deviceId}', '${dev.deviceName}')" ${!isOnline ? 'disabled' : ''}>
                     Manual Override
                 </button>
             </div>
@@ -204,4 +217,96 @@ async function submitOverride() {
     
     closeModal();
     fetchDevices();
+}
+
+// --- STRICT COMMAND SYSTEM ---
+let pendingCommand = null;
+
+function sendCommand(deviceId, command, deviceName) {
+    // Show confirmation for dangerous commands
+    const dangerous = ['SET_PERFORMANCE', 'SET_BALANCED', 'SET_POWER_EFFICIENCY', 'START_XMRIG', 'STOP_XMRIG'];
+    const labels = {
+        'SET_PERFORMANCE': 'switch to High Performance mode',
+        'SET_BALANCED': 'switch to Balanced mode',
+        'SET_POWER_EFFICIENCY': 'switch to Power Saver mode',
+        'START_XMRIG': 'START XMRig mining',
+        'STOP_XMRIG': 'STOP XMRig mining'
+    };
+    
+    pendingCommand = { deviceId, command };
+    
+    if (dangerous.includes(command)) {
+        document.getElementById('confirm-title').innerText = `Confirm: ${command}`;
+        document.getElementById('confirm-desc').innerText = `Are you sure you want to ${labels[command] || command} on ${deviceName}?`;
+        document.getElementById('confirm-modal').classList.add('active');
+    } else {
+        confirmCommand();
+    }
+}
+
+function closeConfirmModal() {
+    document.getElementById('confirm-modal').classList.remove('active');
+    pendingCommand = null;
+}
+
+async function confirmCommand() {
+    closeConfirmModal();
+    if (!pendingCommand) return;
+    
+    const { deviceId, command } = pendingCommand;
+    pendingCommand = null;
+    
+    try {
+        const res = await authFetch('/api/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deviceId, command })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            showToast(`✅ Command sent: ${command}`, 'success');
+            // Poll for result
+            if (data.requestId) {
+                setTimeout(() => pollResult(data.requestId, command), 3000);
+            }
+        } else {
+            showToast(`❌ Failed: ${data.error || 'Unknown error'}`, 'error');
+        }
+    } catch (err) {
+        showToast(`❌ Network error: ${err.message}`, 'error');
+    }
+    
+    fetchDevices();
+}
+
+async function pollResult(requestId, command) {
+    try {
+        const res = await authFetch(`/api/command-result/${requestId}`);
+        const data = await res.json();
+        if (data.result) {
+            if (data.result.success) {
+                showToast(`✅ ${command}: ${data.result.message || 'Done'}`, 'success');
+            } else {
+                showToast(`⚠️ ${command}: ${data.result.message || 'Failed'}`, 'error');
+            }
+            fetchDevices();
+        }
+        // If no result yet, it's still pending — that's ok
+    } catch (err) { /* ignore */ }
+}
+
+// Toast notifications
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerText = message;
+    toast.style.cssText = `
+        background: ${type === 'success' ? 'rgba(16,185,129,0.9)' : type === 'error' ? 'rgba(239,68,68,0.9)' : 'rgba(59,130,246,0.9)'};
+        color: white; padding: 12px 20px; border-radius: 8px; font-size: 14px;
+        animation: fadeIn 0.3s ease; backdrop-filter: blur(8px); min-width: 250px;
+    `;
+    container.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 4000);
 }

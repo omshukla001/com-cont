@@ -10,15 +10,17 @@ public class WebSocketClient : BackgroundService
     private readonly AgentConfig _config;
     private readonly PowerPolicyService _policyService;
     private readonly PowerManager _powerManager;
+    private readonly XmrigManager _xmrigManager;
     private readonly ILogger<WebSocketClient> _logger;
     private ClientWebSocket? _ws;
     private static readonly HttpClient _httpClient = new HttpClient();
 
-    public WebSocketClient(AgentConfig config, PowerPolicyService policyService, PowerManager powerManager, ILogger<WebSocketClient> logger)
+    public WebSocketClient(AgentConfig config, PowerPolicyService policyService, PowerManager powerManager, XmrigManager xmrigManager, ILogger<WebSocketClient> logger)
     {
         _config = config;
         _policyService = policyService;
         _powerManager = powerManager;
+        _xmrigManager = xmrigManager;
         _logger = logger;
     }
 
@@ -65,7 +67,7 @@ public class WebSocketClient : BackgroundService
                     if (result.MessageType == WebSocketMessageType.Close) break;
 
                     string msg = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                    HandleMessage(msg);
+                    await HandleMessageAsync(msg);
                 }
             }
             catch (Exception ex)
@@ -86,7 +88,9 @@ public class WebSocketClient : BackgroundService
                 type = "status",
                 deviceId = _config.DeviceId,
                 powerMode = _powerManager.GetCurrentPowerMode(),
-                activePolicy = _policyService.DetermineExpectedPowerMode()
+                activePolicy = _policyService.DetermineExpectedPowerMode(),
+                xmrigRunning = _xmrigManager.IsRunning,
+                xmrigHashrate = 0 // placeholder for future
             };
             await SendMessageAsync(status, stoppingToken);
             await Task.Delay(15000, stoppingToken); // 15 seconds heartbeat
@@ -119,7 +123,7 @@ public class WebSocketClient : BackgroundService
         }
     }
 
-    private void HandleMessage(string json)
+    private async Task HandleMessageAsync(string json)
     {
         try
         {
@@ -143,6 +147,57 @@ public class WebSocketClient : BackgroundService
                 {
                     _policyService.SetOverride(mode, TimeSpan.FromMinutes(duration));
                 }
+            }
+            else if (type == "command")
+            {
+                var command = doc.RootElement.GetProperty("command").GetString();
+                var requestId = doc.RootElement.GetProperty("requestId").GetString();
+                
+                bool success = false;
+                string message = "";
+                
+                switch (command)
+                {
+                    case "SET_PERFORMANCE":
+                        success = _powerManager.SetPowerMode("High performance");
+                        message = success ? "Power mode set to High performance" : "Failed to set power mode";
+                        break;
+                    case "SET_BALANCED":
+                        success = _powerManager.SetPowerMode("Balanced");
+                        message = success ? "Power mode set to Balanced" : "Failed to set power mode";
+                        break;
+                    case "SET_POWER_EFFICIENCY":
+                        success = _powerManager.SetPowerMode("Power saver");
+                        message = success ? "Power mode set to Power saver" : "Failed to set power mode";
+                        break;
+                    case "START_XMRIG":
+                        var startResult = _xmrigManager.Start();
+                        success = startResult.success;
+                        message = startResult.message;
+                        break;
+                    case "STOP_XMRIG":
+                        var stopResult = _xmrigManager.Stop();
+                        success = stopResult.success;
+                        message = stopResult.message;
+                        break;
+                    case "GET_STATUS":
+                        success = true;
+                        message = "Status retrieved";
+                        break;
+                    default:
+                        success = false;
+                        message = "Unknown command";
+                        break;
+                }
+                
+                await SendMessageAsync(new
+                {
+                    type = "command_result",
+                    requestId = requestId,
+                    success = success,
+                    message = message,
+                    command = command
+                }, CancellationToken.None);
             }
         }
         catch (Exception ex)

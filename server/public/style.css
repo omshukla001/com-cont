@@ -139,3 +139,20 @@ input[type="text"], input[type="password"] {
     padding: 10px 14px; border-radius: 8px; font-family: inherit; margin-top: 4px; transition: border-color 0.2s;
 }
 input[type="text"]:focus, input[type="password"]:focus { outline: none; border-color: var(--primary); }
+
+/* Command Buttons */
+.cmd-buttons { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.cmd-row { display: flex; gap: 6px; }
+.btn-sm { padding: 6px 12px; font-size: 12px; flex: 1; }
+.btn-perf { background: rgba(249, 115, 22, 0.2); color: #f97316; }
+.btn-perf:hover:not(:disabled) { background: rgba(249, 115, 22, 0.35); }
+.btn-bal { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+.btn-bal:hover:not(:disabled) { background: rgba(59, 130, 246, 0.35); }
+.btn-eff { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+.btn-eff:hover:not(:disabled) { background: rgba(16, 185, 129, 0.35); }
+.btn-xmrig-start { background: rgba(168, 85, 247, 0.2); color: #a855f7; }
+.btn-xmrig-start:hover:not(:disabled) { background: rgba(168, 85, 247, 0.35); }
+.btn-xmrig-stop { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.btn-xmrig-stop:hover:not(:disabled) { background: rgba(239, 68, 68, 0.35); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-secondary { background: rgba(255,255,255,0.1); }

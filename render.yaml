@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: pc-control-server
+    env: node
+    # Since the server is in the 'server' folder, we navigate there first
+    buildCommand: cd server && npm install
+    startCommand: cd server && node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production

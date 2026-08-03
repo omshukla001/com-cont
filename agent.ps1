@@ -43,6 +43,16 @@ Ensure-PowerPlans
 
 function Get-PowerMode {
     try {
+        # Check Modern Standby Overlay first
+        $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes"
+        if (Test-Path $regPath) {
+            $overlay = (Get-ItemProperty -Path $regPath -Name "ActiveOverlayAcPowerScheme" -ErrorAction SilentlyContinue).ActiveOverlayAcPowerScheme
+            if ($overlay -eq "ded574b5-45a0-4f42-8737-46345c09c238") { return "High performance" }
+            if ($overlay -eq "961cc777-2547-4f9d-8174-7d86181b8a7a") { return "Power saver" }
+            if ($overlay -eq "00000000-0000-0000-0000-000000000000") { return "Balanced" }
+        }
+
+        # Fallback to base scheme
         $out = powercfg /getactivescheme 2>&1 | Out-String
         if ($out -match '\((.+)\)') { return $Matches[1].Trim() }
     } catch {}

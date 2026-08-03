@@ -27,6 +27,20 @@ function Log($msg) {
     Write-Host "$ts - $msg"
 }
 
+# Ensure all required power plans exist on this PC
+function Ensure-PowerPlans {
+    $schemes = powercfg /list
+    if ($schemes -notmatch "High performance") {
+        Log "Creating 'High performance' power plan..."
+        powercfg /duplicatescheme 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
+    }
+    if ($schemes -notmatch "Power saver") {
+        Log "Creating 'Power saver' power plan..."
+        powercfg /duplicatescheme a1841308-3541-4fab-bc81-f71556f20b4a
+    }
+}
+Ensure-PowerPlans
+
 function Get-PowerMode {
     try {
         $out = powercfg /getactivescheme

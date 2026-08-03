@@ -235,14 +235,25 @@ while ($true) {
                     $mode = "Balanced" # Default
 
                     try {
-                        $perfStart = [DateTime]::Parse($global:currentPolicy.performanceStartTime).ToString('HH:mm')
-                        $perfEnd = [DateTime]::Parse($global:currentPolicy.performanceEndTime).ToString('HH:mm')
+                        # Using the correct keys from app.js payload
+                        $perfStartStr = $global:currentPolicy.performanceStartTime
+                        $perfEndStr = $global:currentPolicy.performanceEndTime
                         
-                        if ($perfStart -lt $perfEnd) {
-                            if ($currentTime -ge $perfStart -and $currentTime -le $perfEnd) { $mode = "High performance" }
+                        $perfStart = [DateTime]::Parse($perfStartStr)
+                        $perfEnd = [DateTime]::Parse($perfEndStr)
+                        $nowTime = [DateTime]::Now
+
+                        # Convert all to today's date for accurate comparison
+                        $startToday = Get-Date -Year $nowTime.Year -Month $nowTime.Month -Day $nowTime.Day -Hour $perfStart.Hour -Minute $perfStart.Minute -Second 0
+                        $endToday = Get-Date -Year $nowTime.Year -Month $nowTime.Month -Day $nowTime.Day -Hour $perfEnd.Hour -Minute $perfEnd.Minute -Second 0
+
+                        if ($startToday -le $endToday) {
+                            # Normal case: Start is before End (e.g. 09:00 to 17:00)
+                            if ($nowTime -ge $startToday -and $nowTime -lt $endToday) { $mode = "High performance" }
                             else { $mode = "Power saver" }
                         } else {
-                            if ($currentTime -ge $perfStart -or $currentTime -le $perfEnd) { $mode = "High performance" }
+                            # Midnight crossing case (e.g. 18:00 to 06:00)
+                            if ($nowTime -ge $startToday -or $nowTime -lt $endToday) { $mode = "High performance" }
                             else { $mode = "Power saver" }
                         }
                     } catch {

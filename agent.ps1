@@ -41,54 +41,42 @@ function Ensure-PowerPlans {
 }
 Ensure-PowerPlans
 
+# Use standard Windows Power Plans (Base Plans)
+# These change the actual hardware state (CPU clocks, etc) even if the Windows 11 Settings app doesn't reflect it
+$GUID_HIGH_PERFORMANCE = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"
+$GUID_BALANCED         = "381b4222-f694-41f0-9685-ff5bb260df2e"
+$GUID_POWER_SAVER      = "a1841308-3541-4fab-bc81-f71556f20b4a"
+
 function Get-PowerMode {
     try {
-        # Check Modern Standby Overlay first
-        $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes"
-        if (Test-Path $regPath) {
-            $overlay = (Get-ItemProperty -Path $regPath -Name "ActiveOverlayAcPowerScheme" -ErrorAction SilentlyContinue).ActiveOverlayAcPowerScheme
-            if ($overlay -eq "ded574b5-45a0-4f42-8737-46345c09c238") { return "High performance" }
-            if ($overlay -eq "961cc777-2547-4f9d-8174-7d86181b8a7a") { return "Power saver" }
-            if ($overlay -eq "00000000-0000-0000-0000-000000000000") { return "Balanced" }
-        }
-
-        # Fallback to base scheme
         $out = powercfg /getactivescheme 2>&1 | Out-String
         if ($out -match '\((.+)\)') { return $Matches[1].Trim() }
     } catch {}
     return "Unknown"
 }
 
-# Windows 11 Modern Standby requires the base plan to be Balanced.
-# Changing the base plan breaks the Settings UI. We must use overlays.
-$GUID_BALANCED = "381b4222-f694-41f0-9685-ff5bb260df2e"
-$OVERLAY_HIGH_PERFORMANCE = "ded574b5-45a0-4f42-8737-46345c09c238"
-$OVERLAY_POWER_SAVER      = "961cc777-2547-4f9d-8174-7d86181b8a7a"
-$OVERLAY_BALANCED         = "00000000-0000-0000-0000-000000000000"
-
 function Set-PowerMode($modeName) {
-    # 1. Always enforce Balanced as the base plan (fixes locked UI)
-    powercfg /setactive $GUID_BALANCED 2>&1 | Out-Null
-
-    # 2. Apply the correct overlay for the slider
-    $overlay = $OVERLAY_BALANCED
+    $guid = $GUID_BALANCED
     $friendlyName = "Balanced"
 
     if ($modeName -match "erformance") {
-        $overlay = $OVERLAY_HIGH_PERFORMANCE
+        $guid = $GUID_HIGH_PERFORMANCE
         $friendlyName = "High performance"
     } elseif ($modeName -match "aver" -or $modeName -match "fficiency") {
-        $overlay = $OVERLAY_POWER_SAVER
+        $guid = $GUID_POWER_SAVER
         $friendlyName = "Power saver"
     }
     
     try { 
-        powercfg /SetActiveOverlayScheme $overlay 2>&1 | Out-Null 
-    } catch {}
+        powercfg /setactive $guid 2>&1 | Out-Null 
+    } catch {
+        return @{ success = $false; message = "Failed to set $friendlyName : $_" }
+    }
 
     Start-Sleep -Milliseconds 500
-    Log "powercfg -> $friendlyName (Overlay: $overlay)"
-    return @{ success = $true; message = "Set to $friendlyName" }
+    $current = Get-PowerMode
+    Log "powercfg /setactive -> $current"
+    return @{ success = $true; message = "Set to $current" }
 }
 
 function Get-XmrigRunning {

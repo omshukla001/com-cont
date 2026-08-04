@@ -226,4 +226,15 @@ function broadcastPolicy() {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Secure Central Server running on port ${PORT}`);
+
+    // Self-ping every 10 minutes to prevent Render free tier from sleeping
+    const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
+    if (RENDER_URL) {
+        setInterval(() => {
+            fetch(`${RENDER_URL}/api/ping`)
+                .then(() => console.log('Self-ping OK'))
+                .catch(() => console.log('Self-ping failed'));
+        }, 10 * 60 * 1000); // Every 10 minutes
+        console.log('Self-ping enabled to keep Render awake.');
+    }
 });
